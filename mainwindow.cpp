@@ -13,6 +13,12 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QCloseEvent>
+#include <QFileInfo>
+#include <QCoreApplication>
+#include <QPropertyAnimation>
+#include <QSequentialAnimationGroup>
+#include <QGraphicsOpacityEffect>
+#include <windows.h>
 
 
 MainWindow::MainWindow(QWidget *parent):QMainWindow(parent),ui(new Ui::MainWindow)
@@ -55,10 +61,54 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent),ui(new Ui::MainWindo
 
 
     // 初始化 Label
-    ui->labelLevel->setText(QString("第%1层").arg(currentLevel));
+    ui->labelLevel->setText(QString("Lv.%1").arg(currentLevel));
     updateHPUI();
-    ui->labelGold->setText(QString("金币：%1").arg(gold));
-    ui->labelATK->setText(QString("攻击力: %1").arg(playerATK));
+    ui->labelGold->setText(QString("Gold: %1").arg(gold));
+    ui->labelATK->setText(QString("ATK: %1").arg((int)playerATK));
+    ui->labelHelp->setText(
+        "🏰 DungeonGamble — 地牢赌徒\n\n"
+        "这是一个爬塔类型的策略游戏。\n"
+        "既需要勇气也需要运气。\n\n"
+        "每一层有三种怪物：\n"
+        "🐺 小怪  |  👹 大怪  |  🐉 精英怪\n"
+        "其中只有一个是正确路径。\n\n"
+        "✔ 选对怪物：进入下一层\n"
+        "✖ 选错怪物：获得金币，但不升层\n\n"
+        "⚔️ 战斗会消耗血量，怪物越强风险越高\n"
+        "🏪 可以在商店购买道具\n\n"
+        "👑 每10层会出现Boss关卡\n"
+        "Boss为回合制战斗，需要策略应对\n\n"
+        "你的目标很简单：尽可能爬得更高。\n\n"
+        "🎮 操作：← → 选择  Enter 确认\n"
+        "S 商店  |  M 静音  |  ↑ ↓ Boss策略"
+        );
+    ui->labelHelp->setStyleSheet(
+        "font-size:16px;"
+        "color:#d4c8a0;"
+        "background:transparent;"
+        );
+this->setStyleSheet(R"(
+    QWidget { background-color: #0d0d0d; color: #d4c8a0; font-size: 14px; }
+    QScrollBar:vertical { background: #1a1a1a; width: 8px; border-radius: 4px; }
+    QScrollBar::handle:vertical { background: #5a4a2a; border-radius: 4px; min-height: 20px; }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+    QPushButton { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #3a3020,stop:1 #1e1808); color: #d4c8a0; border: 2px solid #5a4a2a; border-radius: 10px; padding: 8px 16px; font-weight: bold; font-size: 14px; }
+    QPushButton:hover { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #5a4a2a,stop:1 #3a3020); border-color: #c8a840; color: #f0d860; }
+    QPushButton:pressed { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #1e1808,stop:1 #0d0d0d); border-color: #8a6a2a; }
+    QPushButton:disabled { background: #1a1a1a; color: #555; border: 1px solid #333; }
+    QPushButton#btnMonster1, QPushButton#btnMonster2, QPushButton#btnMonster3 { min-height: 64px; font-size: 20px; border: 3px solid #4a3a1a; border-radius: 14px; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #2a2010,stop:0.5 #1a1008,stop:1 #0a0800); }
+    QPushButton#btnMonster1:hover, QPushButton#btnMonster2:hover, QPushButton#btnMonster3:hover { border-color: #c04040; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a2010,stop:0.5 #2a1008,stop:1 #1a0800); }
+    QPushButton#btnAttack { color: #ff6644; font-size: 16px; border-color: #8a3020; }
+    QPushButton#btnDefend { color: #44aaff; font-size: 16px; border-color: #20308a; }
+    QPushButton#btnNormal { color: #aacc88; font-size: 16px; border-color: #3a5a20; }
+    QPushButton#btnShop { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00); border-color: #c8a840; color: #f0d860; font-size: 16px; }
+    QLabel#labelLevel, QLabel#labelGold, QLabel#labelATK { color: #f0d860; font-weight: bold; font-size: 14px; background: transparent; }
+    QLabel#labelHP { color: #ff8866; font-weight: bold; font-size: 14px; background: transparent; }
+    QLabel#labelBossHP { color: #ff4444; font-weight: bold; font-size: 18px; background: transparent; }
+    QTextEdit#textLog { background: rgba(0,0,0,180); color: #a09070; border: 1px solid #3a3020; border-radius: 8px; font-family: "Courier New", monospace; font-size: 11px; }
+    QLabel#labelMonster1Damage, QLabel#labelMonster2Damage, QLabel#labelMonster3Damage { color: #e07050; font-weight: bold; }
+    QLabel#labelMonster1Gold, QLabel#labelMonster2Gold, QLabel#labelMonster3Gold { color: #e0c860; font-weight: bold; }
+)");
 
     updateMonsterByLevel();
     updateMonsterDamageUI();
@@ -67,6 +117,8 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent),ui(new Ui::MainWindo
 
     this->setFocusPolicy(Qt::StrongFocus);
     this->setFocus();
+
+    playBGM("sounds/dungeon_bgm.mp3");
 
     ui->btnMonster1->setFocusPolicy(Qt::NoFocus);
     ui->btnMonster2->setFocusPolicy(Qt::NoFocus);
@@ -85,6 +137,12 @@ MainWindow::MainWindow(QWidget *parent):QMainWindow(parent),ui(new Ui::MainWindo
 }
 void MainWindow::keyPressEvent(QKeyEvent *event)
 {
+    if(event->key() == Qt::Key_M)
+    {
+        toggleBGM();
+        return;
+    }
+
     if(ui->stackedWidget->currentIndex() != 1)
         return;
 
@@ -141,6 +199,8 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 void MainWindow::on_startButton_clicked()
 {
     ui->stackedWidget->setCurrentIndex(1);
+    bgmMuted = false;
+    playBGM("sounds/dungeon_bgm.mp3");
 
     this->setFocus();
 }
@@ -184,11 +244,11 @@ void MainWindow::updateSelectionUI()
 
     // 根据 selectedIndex 高亮
     if(selectedIndex == 1)
-        ui->btnMonster1->setStyleSheet("background-color: rgba(100,180,255,30); border:1px solid rgba(100,180,255,80);");
+        ui->btnMonster1->setStyleSheet("border:3px solid #f0d860; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00);");
     else if(selectedIndex == 2)
-        ui->btnMonster2->setStyleSheet("background-color: rgba(100,180,255,30); border:1px solid rgba(100,180,255,80);");
+        ui->btnMonster2->setStyleSheet("border:3px solid #f0d860; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00);");
     else if(selectedIndex == 3)
-        ui->btnMonster3->setStyleSheet("background-color: rgba(100,180,255,30); border:1px solid rgba(100,180,255,80);");
+        ui->btnMonster3->setStyleSheet("border:3px solid #f0d860; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00);");
 }
 void MainWindow::updateBossSelectionUI()
 {
@@ -199,11 +259,11 @@ void MainWindow::updateBossSelectionUI()
 
     // 根据选中项高亮
     if(bossSelectedIndex == 1)
-        ui->btnAttack->setStyleSheet("background-color: rgba(100,180,255,30); border:1px solid rgba(100,180,255,80);");
+        ui->btnAttack->setStyleSheet("border:3px solid #f0d860; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00);");
     else if(bossSelectedIndex == 2)
-        ui->btnDefend->setStyleSheet("background-color: rgba(100,180,255,30); border:1px solid rgba(100,180,255,80);");
+        ui->btnDefend->setStyleSheet("border:3px solid #f0d860; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00);");
     else if(bossSelectedIndex == 3)
-        ui->btnNormal->setStyleSheet("background-color: rgba(100,180,255,30); border:1px solid rgba(100,180,255,80);");
+        ui->btnNormal->setStyleSheet("border:3px solid #f0d860; background: qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #4a3a10,stop:1 #2a1a00);");
 }
 void MainWindow::updateMonsterByLevel()
 {
@@ -267,6 +327,8 @@ void MainWindow::fightMonster(int monsterType) {
     if(currentHP < 0) currentHP = 0;
 
     updateHPUI();
+    shake(ui->centralwidget);
+    flash(ui->centralwidget);
 
     // 选对怪物升层
     QString monsterName;
@@ -286,10 +348,10 @@ void MainWindow::fightMonster(int monsterType) {
 
     gold+=reward;
 
-    ui->labelGold->setText(QString("金币：%1").arg(gold));
+    ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
     if(monsterType == correctMonster) {
-        ui->labelATK->setText(QString("攻击力: %1").arg(playerATK));
+        ui->labelATK->setText(QString("ATK: %1").arg((int)playerATK));
         QString rewardText;
 
         if(reward > baseGold)
@@ -303,7 +365,7 @@ void MainWindow::fightMonster(int monsterType) {
                    .arg(monsterName)
                    .arg(reward));
         currentLevel++;
-        ui->labelLevel->setText(QString("第%1层").arg(currentLevel));
+        ui->labelLevel->setText(QString("Lv.%1").arg(currentLevel));
 
         playerATK+=1;
         addLog(QString("—— 第%1层 ——").arg(currentLevel));
@@ -386,7 +448,7 @@ void MainWindow::on_btnShop_clicked()
             gold -= 50;
             currentHP += 30;
 
-            ui->labelGold->setText(QString("金币：%1").arg(gold));
+            ui->labelGold->setText(QString("Gold: %1").arg(gold));
             updateHPUI();
 
             QMessageBox::information(this, "商店", "回血成功！");
@@ -403,7 +465,7 @@ void MainWindow::on_btnShop_clicked()
             gold -= 150;
             currentHP += 120;
 
-            ui->labelGold->setText(QString("金币：%1").arg(gold));
+            ui->labelGold->setText(QString("Gold: %1").arg(gold));
             updateHPUI();
 
             QMessageBox::information(this, "商店", "回血成功！");
@@ -419,7 +481,7 @@ void MainWindow::on_btnShop_clicked()
         if(gold >= 30)
         {
             gold -= 30;
-            ui->labelGold->setText(QString("金币：%1").arg(gold));
+            ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
             QString hint;
             if(correctMonster == 1) hint = "小怪";
@@ -441,7 +503,7 @@ void MainWindow::on_btnShop_clicked()
             gold -= 15;
             hasEliminate = true;
 
-            ui->labelGold->setText(QString("金币：%1").arg(gold));
+            ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
             QMessageBox::information(this, "商店", "你获得了一张【排除卷轴】！");
         }
@@ -470,7 +532,7 @@ void MainWindow::on_btnShop_clicked()
             gold -= 80;
             bossAtkBuff = true;
 
-            ui->labelGold->setText(QString("金币：%1").arg(gold));
+            ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
             QMessageBox::information(this, "商店", "攻击药水已生效（本次Boss战）！");
         }
@@ -498,7 +560,7 @@ void MainWindow::on_btnShop_clicked()
             gold -= 100;
             bossDefBuff = true;
 
-            ui->labelGold->setText(QString("金币：%1").arg(gold));
+            ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
             QMessageBox::information(this, "商店", "防御药水已生效（本次Boss战）！");
         }
@@ -547,8 +609,8 @@ void MainWindow::enterBossMode()
     bossDefBuff=false;
     bossMaxHP=10+currentLevel*5;
     bossHP=bossMaxHP;
-    ui->labelLevel->setText(QString("第%1层（boss）").arg(currentLevel));
-    ui->labelBossHP->setText(QString("Boss血量:%1").arg(bossHP));
+    ui->labelLevel->setText(QString("Lv.%1 [BOSS]").arg(currentLevel));
+    ui->labelBossHP->setText(QString("Boss HP:%1").arg(bossHP));
 
     ui->btnMonster1->hide();
     ui->btnMonster2->hide();
@@ -600,6 +662,7 @@ void MainWindow::GameOver()
 
     QMessageBox::information(this,"Game Over","你死了！");
 
+    stopBGM();
     ui->stackedWidget->setCurrentIndex(0);
 
     currentLevel=1;
@@ -607,11 +670,11 @@ void MainWindow::GameOver()
     gold=200;
     playerATK=30;
     bossAtkBuff=false;
-    ui->labelATK->setText(QString("攻击力: %1").arg(playerATK));
+    ui->labelATK->setText(QString("ATK: %1").arg((int)playerATK));
 
     ui->labelLevel->setText(QString("第%1层").arg(currentLevel));
     updateHPUI();
-    ui->labelGold->setText(QString("金币：%1").arg(gold));
+    ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
     battleLogs.clear();
     ui->textLog->clear();
@@ -719,27 +782,29 @@ void MainWindow::fightBossRound(int playerChoice)
     if(bossHP < 0) bossHP = 0;
 
     updateHPUI();
+    shake(ui->centralwidget);
+    flash(ui->centralwidget);
     if(bossAtkBuff && bossDefBuff)
     {
         ui->labelBossHP->setText(
-            QString("Boss血量: %1（攻↑ 防↑）").arg(bossHP)
+            QString("Boss HP: %1（攻↑ 防↑）").arg(bossHP)
             );
     }
     else if(bossAtkBuff)
     {
         ui->labelBossHP->setText(
-            QString("Boss血量: %1（攻击↑）").arg(bossHP)
+            QString("Boss HP: %1（攻击↑）").arg(bossHP)
             );
     }
     else if(bossDefBuff)
     {
         ui->labelBossHP->setText(
-            QString("Boss血量: %1（防御↑）").arg(bossHP)
+            QString("Boss HP: %1（防御↑）").arg(bossHP)
             );
     }
     else
     {
-        ui->labelBossHP->setText(QString("Boss血量: %1").arg(bossHP));
+        ui->labelBossHP->setText(QString("Boss HP: %1").arg(bossHP));
     }
     // 提示
     QString msg;
@@ -798,12 +863,12 @@ void MainWindow::fightBossRound(int playerChoice)
         gold += reward;
         bossAtkBuff=false;
 
-        ui->labelGold->setText(QString("金币：%1").arg(gold));
+        ui->labelGold->setText(QString("Gold: %1").arg(gold));
 
         currentLevel++;
         playerATK += 5 + currentLevel / 10;
-        ui->labelATK->setText(QString("攻击力: %1").arg(playerATK));
-        ui->labelLevel->setText(QString("第%1层").arg(currentLevel));
+        ui->labelATK->setText(QString("ATK: %1").arg((int)playerATK));
+        ui->labelLevel->setText(QString("Lv.%1").arg(currentLevel));
 
         // 恢复普通模式
         ui->btnMonster1->show();
@@ -892,7 +957,7 @@ void MainWindow::addLog(QString text)
 }
 void MainWindow::updateHPUI()
 {
-    ui->labelHP->setText(QString("当前血量: %1").arg(currentHP));
+    ui->labelHP->setText(QString("HP: %1").arg((int)currentHP));
 
     if(currentHP <= 50)
     {
@@ -927,4 +992,69 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 
     event->accept();
+}
+
+QString MainWindow::findFile(const QString &rel)
+{
+    QStringList tries;
+    tries << rel;
+    tries << QCoreApplication::applicationDirPath() + "/" + rel;
+    tries << QCoreApplication::applicationDirPath() + "/../../" + rel;
+    tries << QCoreApplication::applicationDirPath() + "/../../../" + rel;
+    for(const auto &t : tries)
+        if(QFile::exists(t)) return QFileInfo(t).absoluteFilePath();
+    return {};
+}
+
+void MainWindow::playBGM(const QString &fp)
+{
+    stopBGM();
+    QString abs = findFile(fp);
+    if(abs.isEmpty()) return;
+    std::wstring cmd = L"open \"" + abs.toStdWString() + L"\" type mpegvideo alias bgm";
+    mciSendString(cmd.c_str(), NULL, 0, NULL);
+    mciSendString(L"play bgm repeat", NULL, 0, NULL);
+}
+
+void MainWindow::stopBGM()
+{
+    mciSendString(L"close bgm", NULL, 0, NULL);
+}
+
+void MainWindow::toggleBGM()
+{
+    bgmMuted = !bgmMuted;
+    if(bgmMuted) mciSendString(L"stop bgm", NULL, 0, NULL);
+    else mciSendString(L"play bgm repeat", NULL, 0, NULL);
+}
+
+void MainWindow::shake(QWidget *t)
+{
+    if(!t) t = ui->centralwidget;
+    int ox = t->x(), oy = t->y();
+    auto *g = new QSequentialAnimationGroup(this);
+    int shifts[5][2] = {{6,-4}, {-5,3}, {3,-2}, {-4,2}, {0,0}};
+    for(int i = 0; i < 5; i++)
+    {
+        auto *a = new QPropertyAnimation(t, "pos");
+        a->setDuration(25);
+        a->setStartValue(QPoint(ox, oy));
+        a->setEndValue(QPoint(ox + shifts[i][0], oy + shifts[i][1]));
+        g->addAnimation(a);
+    }
+    g->start(QAbstractAnimation::DeleteWhenStopped);
+}
+
+void MainWindow::flash(QWidget *t)
+{
+    auto *e = new QGraphicsOpacityEffect(t);
+    e->setOpacity(0);
+    t->setGraphicsEffect(e);
+    auto *a = new QPropertyAnimation(e, "opacity");
+    a->setDuration(80);
+    a->setStartValue(0.30);
+    a->setEndValue(0.0);
+    a->setEasingCurve(QEasingCurve::OutQuad);
+    a->start(QAbstractAnimation::DeleteWhenStopped);
+    QTimer::singleShot(80, [t]() { t->setGraphicsEffect(nullptr); });
 }

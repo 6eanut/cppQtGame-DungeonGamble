@@ -18,6 +18,7 @@ target_link_libraries(cppend
     PRIVATE
         Qt::Core
         Qt::Widgets
+        winmm
 )
 
 install(TARGETS cppend
