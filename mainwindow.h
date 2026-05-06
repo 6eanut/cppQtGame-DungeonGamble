@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QMessageBox>
 #include <QStringList>
+#include <QTimer>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -98,6 +99,15 @@ private:
     void enterShopMode();
     void handleShopBuy(int);
     int maxLevel;
+
+    // 3.0 美化
+    bool bgmMuted = false;
+    void playBGM(const QString &fp);
+    void stopBGM();
+    void toggleBGM();
+    QString findFile(const QString &rel);
+    void shake(QWidget *t);
+    void flash(QWidget *t);
 };
 
 

@@ -58,5 +58,3 @@ void ShopDialog::keyPressEvent(QKeyEvent *event)
 
     QDialog::keyPressEvent(event);
 }
-
-
